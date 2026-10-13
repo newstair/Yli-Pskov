@@ -35,5 +35,5 @@
       "prices": { "pine": 10650, "beech": 18000, "ash": 26000, "oak": 35000 }
     }
   },
-  "paint": { "price_m2": 2400 }
+  "paint": { "price_m2": 1800 }
 }
