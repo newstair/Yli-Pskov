@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Viewer</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<meta property="og:title" content="3D Viewer">
+<meta property="og:description" content="Просмотр 3D-модели лестницы">
+<meta property="og:image" content="preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:type" content="website">
+<style>
+  :root{
+    --bg:#0f1116; --panel:rgba(22,25,33,.92);
+    --border:rgba(255,255,255,.09); --border-str:rgba(255,255,255,.16);
+    --text:#e9edf5; --muted:#8b95a8;
+    --accent:#5b8cff; --accent-2:#31d0aa; --danger:#ff6b6b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:'Inter','Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+    background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;}
+  #canvas{display:block;width:100%;height:100%;outline:none;cursor:grab;touch-action:none;}
+  #canvas:active{cursor:grabbing;}
+  #canvas.ruler-mode{cursor:crosshair;}
+  #canvas.human-mode{cursor:pointer;}
+
+  .brand{position:fixed;top:18px;left:18px;display:flex;align-items:center;gap:12px;
+    padding:10px 16px 10px 12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:var(--radius);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    z-index:20;pointer-events:none;user-select:none;}
+  .logo{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));font-size:17px;
+    color:#0b0d12;font-weight:800;box-shadow:0 4px 16px rgba(91,140,255,.35);}
+  .brand h1{margin:0;font-size:14px;font-weight:650;}
+  .brand p{margin:2px 0 0;font-size:11px;color:var(--muted);}
+
+  .panel{position:fixed;top:18px;right:18px;width:290px;padding:14px;
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    z-index:20;display:flex;flex-direction:column;gap:9px;
+    max-height:calc(100vh - 36px);overflow-y:auto;
+    transition:transform .25s ease, opacity .25s ease;}
+  .panel::-webkit-scrollbar{width:6px;}
+  .panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px;}
+  .panel.hidden{transform:translateX(calc(100% + 30px));opacity:0;pointer-events:none;}
+  .panel-title{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--muted);font-weight:600;margin-bottom:2px;margin-top:6px;}
+  .panel-title:first-child{margin-top:0;}
+  .row{display:flex;gap:8px;} .row > .btn{flex:1;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 8px;font-family:inherit;font-size:12px;font-weight:550;color:var(--text);
+    background:rgba(255,255,255,.055);border:1px solid var(--border);border-radius:10px;
+    cursor:pointer;transition:background .16s,border-color .16s,transform .1s,color .16s;
+    white-space:nowrap;-webkit-user-select:none;user-select:none;}
+  .btn:hover{background:rgba(255,255,255,.1);border-color:var(--border-str);}
+  .btn:active{transform:scale(.97);}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#4a76e8);
+    border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(91,140,255,.3);}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .btn.active{background:rgba(91,140,255,.22);border-color:rgba(91,140,255,.55);color:#b9cdff;}
+  .btn.ruler-on{background:linear-gradient(135deg,#ff9f43,#ff7043);
+    border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(255,112,67,.35);}
+  .btn.human-on{background:linear-gradient(135deg,#31d0aa,#1e9e80);
+    border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(49,208,170,.35);}
+  .btn .ico{font-size:13px;line-height:1;}
+  .divider{height:1px;background:var(--border);margin:3px 0;}
+  .color-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:6px 8px 6px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border);
+    border-radius:10px;font-size:12px;color:var(--muted);}
+  input[type="color"]{-webkit-appearance:none;appearance:none;width:44px;height:26px;
+    padding:0;border:none;border-radius:7px;background:transparent;cursor:pointer;overflow:hidden;}
+  input[type="color"]::-webkit-color-swatch-wrapper{padding:0;}
+  input[type="color"]::-webkit-color-swatch{border:1px solid var(--border-str);border-radius:7px;}
+
+  .slider-row{display:flex;flex-direction:column;gap:6px;
+    padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border);
+    border-radius:10px;}
+  .slider-label{display:flex;justify-content:space-between;align-items:center;
+    font-size:11px;color:var(--muted);}
+  .slider-label b{color:var(--accent-2);font-size:13px;font-weight:700;}
+  input[type="range"].heightSlider{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;
+    background:rgba(255,255,255,.12);border-radius:3px;outline:none;cursor:pointer;
+  }
+  input[type="range"].heightSlider::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;
+    background:linear-gradient(135deg,#31d0aa,#1e9e80);border:2px solid #0f1116;cursor:pointer;
+    box-shadow:0 2px 8px rgba(49,208,170,.5);}
+  input[type="range"].heightSlider::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%;
+    background:linear-gradient(135deg,#31d0aa,#1e9e80);border:2px solid #0f1116;cursor:pointer;
+    box-shadow:0 2px 8px rgba(49,208,170,.5);}
+
+  .finish-row{display:flex;flex-direction:column;gap:0;
+    background:rgba(255,255,255,.04);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;}
+  .finish-header{display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:10px 12px;cursor:pointer;transition:background .15s;}
+  .finish-header:hover{background:rgba(255,255,255,.05);}
+  .finish-header .label{font-size:12px;color:var(--muted);font-weight:550;}
+  .finish-header .value{font-size:12px;color:var(--text);font-weight:600;
+    display:flex;align-items:center;gap:6px;}
+  .finish-header .arrow{font-size:10px;color:var(--muted);transition:transform .2s;}
+  .finish-row.open .arrow{transform:rotate(180deg);}
+  .finish-options{display:none;flex-direction:column;gap:2px;
+    padding:6px;max-height:260px;overflow-y:auto;
+    background:rgba(0,0,0,.2);border-top:1px solid var(--border);}
+  .finish-row.open .finish-options{display:flex;}
+  .finish-options::-webkit-scrollbar{width:6px;}
+  .finish-options::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px;}
+  .finish-option{display:flex;align-items:center;gap:10px;padding:8px 10px;
+    font-size:12px;color:var(--text);background:transparent;border:none;
+    border-radius:7px;cursor:pointer;text-align:left;font-family:inherit;
+    transition:background .15s;}
+  .finish-option:hover{background:rgba(255,255,255,.08);}
+  .finish-option.selected{background:rgba(91,140,255,.2);color:#b9cdff;font-weight:600;}
+  .finish-option .swatch{width:20px;height:20px;border-radius:5px;background:#333;
+    border:1px solid rgba(255,255,255,.15);flex-shrink:0;
+    background-size:cover;background-position:center;}
+
+  .panel-toggle{position:fixed;top:18px;right:18px;width:44px;height:44px;
+    display:none;align-items:center;justify-content:center;
+    background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;color:var(--text);font-size:20px;cursor:pointer;z-index:21;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    transition:transform .15s, background .15s;-webkit-user-select:none;user-select:none;}
+  .panel-toggle:hover{background:rgba(255,255,255,.1);}
+  .panel-toggle:active{transform:scale(.94);}
+  .panel-toggle.active{background:rgba(91,140,255,.25);border-color:rgba(91,140,255,.5);color:#b9cdff;}
+
+  .info{position:fixed;left:18px;bottom:18px;min-width:212px;padding:12px 14px;
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:20;font-size:12px;
+    display:flex;flex-direction:column;gap:6px;opacity:0;transform:translateY(12px);
+    pointer-events:none;transition:opacity .3s,transform .3s;}
+  .info.show{opacity:1;transform:none;pointer-events:auto;}
+  .info-row{display:flex;justify-content:space-between;gap:18px;}
+  .info-row span{color:var(--muted);}
+  .info-row b{font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .info-head{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:2px;}
+
+  .loading{position:fixed;inset:0;z-index:55;display:grid;place-items:center;
+    background:rgba(10,12,18,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;}
+  .loading.show{opacity:1;visibility:visible;}
+  .spinner{width:44px;height:44px;border:3px solid rgba(255,255,255,.12);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
+    margin:0 auto 16px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading p{margin:0;font-size:13px;color:var(--muted);text-align:center;}
+
+  .toast{position:fixed;left:50%;bottom:32px;transform:translate(-50%,20px);
+    padding:12px 20px;background:rgba(30,34,44,.96);border:1px solid var(--border-str);
+    border-left:3px solid var(--danger);border-radius:11px;font-size:13px;color:var(--text);
+    z-index:80;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+    box-shadow:0 12px 36px rgba(0,0,0,.45);max-width:min(90vw,460px);}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast.ok{border-left-color:var(--accent-2);}
+
+  .progress{position:fixed;left:0;right:0;top:0;height:3px;z-index:70;
+    background:transparent;pointer-events:none;opacity:0;transition:opacity .3s;}
+  .progress.show{opacity:1;}
+  .progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    transition:width .15s ease;}
+
+  .mode-hint{position:fixed;left:50%;top:24px;transform:translateX(-50%);
+    padding:10px 18px;color:#fff;border-radius:12px;font-size:13px;font-weight:600;
+    z-index:75;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .mode-hint.show{opacity:1;}
+  .mode-hint.ruler{background:linear-gradient(135deg,#ff9f43,#ff7043);
+    box-shadow:0 8px 24px rgba(255,112,67,.4);}
+  .mode-hint.human{background:linear-gradient(135deg,#31d0aa,#1e9e80);
+    box-shadow:0 8px 24px rgba(49,208,170,.4);}
+
+  /* ---------- Модальное окно сметы ---------- */
+  .price-modal-overlay{
+    position:fixed;inset:0;z-index:90;
+    background:rgba(10,12,18,.75);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;padding:20px;
+    opacity:0;visibility:hidden;transition:opacity .25s, visibility .25s;}
+  .price-modal-overlay.show{opacity:1;visibility:visible;}
+  .price-modal{width:100%;max-width:520px;max-height:90vh;
+    background:var(--panel);border:1px solid var(--border);border-radius:18px;
+    box-shadow:0 24px 80px rgba(0,0,0,.6);overflow:hidden;
+    display:flex;flex-direction:column;transform:translateY(20px);
+    transition:transform .3s ease;}
+  .price-modal-overlay.show .price-modal{transform:translateY(0);}
+  .price-modal-header{display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .price-modal-header .title{font-size:16px;font-weight:700;
+    display:flex;align-items:center;gap:8px;}
+  .price-modal-header .subtitle{font-size:12px;color:var(--muted);font-weight:500;
+    display:block;margin-top:2px;}
+  .price-modal-close{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1px solid var(--border);border-radius:8px;
+    color:var(--muted);font-size:16px;cursor:pointer;transition:background .15s, color .15s;}
+  .price-modal-close:hover{background:rgba(255,255,255,.08);color:var(--text);}
+  .price-modal-close:active{transform:scale(.95);}
+  .price-modal-body{padding:16px 20px;overflow-y:auto;flex:1;
+    display:flex;flex-direction:column;gap:10px;}
+  .price-modal-body::-webkit-scrollbar{width:6px;}
+  .price-modal-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px;}
+  .price-cat{display:flex;flex-direction:column;gap:4px;padding:10px 12px;
+    background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;}
+  .price-cat-name{font-size:13px;font-weight:600;color:var(--text);
+    display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .price-cat-name .material{font-size:11px;font-weight:500;color:var(--accent);
+    padding:2px 7px;background:rgba(91,140,255,.12);border-radius:5px;}
+  .price-cat-formula{font-size:11px;color:var(--muted);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .price-cat-result{font-size:15px;font-weight:700;color:var(--text);
+    text-align:right;margin-top:2px;}
+  .price-totals{display:flex;flex-direction:column;gap:8px;padding:14px 12px 6px;
+    border-top:1px solid var(--border);margin-top:6px;}
+  .price-totals-row{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:13px;color:var(--muted);}
+  .price-totals-row span:last-child{color:var(--text);font-weight:600;}
+  .price-totals-row.total{font-size:17px;padding-top:8px;
+    border-top:1px solid var(--border);margin-top:4px;}
+  .price-totals-row.total span:first-child{color:var(--text);font-weight:600;}
+  .price-totals-row.total span:last-child{color:var(--accent-2);font-weight:800;font-size:20px;
+    text-shadow:0 0 20px rgba(49,208,170,.3);}
+  .price-modal-footer{padding:14px 20px;border-top:1px solid var(--border);
+    display:flex;justify-content:center;flex-shrink:0;}
+  .price-modal-footer .btn{min-width:140px;padding:11px 20px;font-size:13px;}
+  .price-empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:13px;line-height:1.6;}
+
+  @media (max-width:640px){
+    .brand{padding:8px 12px 8px 8px;top:12px;left:12px;}
+    .brand h1{font-size:12px;} .brand p{display:none;}
+    .logo{width:28px;height:28px;font-size:14px;border-radius:8px;}
+    .panel-toggle{display:flex;top:12px;right:12px;width:40px;height:40px;font-size:18px;}
+    .panel{top:auto;bottom:12px;right:12px;left:12px;width:auto;
+      flex-direction:row;flex-wrap:wrap;gap:6px;padding:10px;max-height:65vh;
+      transform:translateY(calc(100% + 30px));opacity:0;pointer-events:none;}
+    .panel.open{transform:translateY(0);opacity:1;pointer-events:auto;}
+    .panel .btn{font-size:11px;padding:8px 6px;flex:1 1 auto;min-width:80px;}
+    .panel .row{flex:1 1 100%;}
+    .panel-title{flex:1 1 100%;margin-top:0;font-size:9px;}
+    .divider{flex:1 1 100%;}
+    .color-row{flex:1 1 100%;}
+    .slider-row{flex:1 1 100%;}
+    .finish-row{flex:1 1 100%;}
+    .info{display:none;}
+    .mode-hint{top:auto;bottom:80px;font-size:12px;padding:8px 14px;}
+    .price-modal{max-width:100%;max-height:95vh;border-radius:14px;}
+    .price-modal-header{padding:14px 16px;}
+    .price-modal-body{padding:14px 16px;gap:8px;}
+    .price-modal-footer{padding:12px 16px;}
+    .price-cat{padding:9px 10px;}
+    .price-cat-result{font-size:14px;}
+    .price-totals-row.total{font-size:15px;}
+    .price-totals-row.total span:last-child{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<header class="brand">
+  <div class="logo">◈</div>
+  <div>
+    <h1>3D Viewer</h1>
+    <p>Просмотр Collada (.dae)</p>
+  </div>
+</header>
+
+<button class="panel-toggle" id="panelToggle" title="Настройки" aria-label="Настройки">⚙</button>
+
+<aside class="panel hidden" id="panel">
+  <div class="panel-title">Общее</div>
+  <button class="btn primary" id="btnOpen"><span class="ico">📂</span> Открыть .dae</button>
+  <div class="row">
+    <button class="btn" id="btnFit" title="Вписать (F)"><span class="ico">⛶</span> Вписать</button>
+    <button class="btn" id="btnRotate" title="Автовращение (R)"><span class="ico">⟳</span> Вращение</button>
+  </div>
+
+  <div class="panel-title">Элементы модели</div>
+  <div class="row">
+    <button class="btn active" id="el_treads" title="Ступени"><span class="ico">🪵</span> Ступени</button>
+    <button class="btn active" id="el_risers" title="Подступенки"><span class="ico">📐</span> Подступенки</button>
+  </div>
+  <div class="row">
+    <button class="btn active" id="el_stringers" title="Тетивы"><span class="ico">🏗</span> Тетивы</button>
+    <button class="btn active" id="el_handrail" title="Поручень"><span class="ico">➖</span> Поручень</button>
+  </div>
+  <div class="row">
+    <button class="btn active" id="el_baluster" title="Балясины"><span class="ico">🪜</span> Балясины</button>
+    <button class="btn active" id="el_posts" title="Столбы"><span class="ico">🏛</span> Столбы</button>
+  </div>
+  <div class="row">
+    <button class="btn active" id="el_wall" title="Стена"><span class="ico">🧱</span> Стена</button>
+    <button class="btn active" id="el_opening" title="Проём"><span class="ico">🪟</span> Проём</button>
+    <button class="btn active" id="el_covering" title="Панель перекрытия"><span class="ico">📏</span> Панель</button>
+  </div>
+  <div class="row">
+    <button class="btn active" id="el_floor" title="Пол"><span class="ico">🌳</span> Пол</button>
+    <button class="btn active" id="btnGlass" title="Прозрачные стены"><span class="ico">◇</span> Стекло</button>
+  </div>
+
+  <div class="panel-title">Инструменты</div>
+  <div class="row">
+    <button class="btn" id="btnRuler" title="Линейка (M)"><span class="ico">📏</span> Линейка</button>
+    <button class="btn" id="btnRulerClear" title="Очистить"><span class="ico">✕</span> Очистить</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="btnHuman" title="Человечек (H)"><span class="ico">🧍</span> Человечек</button>
+    <button class="btn" id="btnHumanRemove" title="Убрать"><span class="ico">✕</span> Убрать</button>
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-label"><span>Рост человека</span><b id="heightValue">185 см</b></div>
+    <input type="range" id="heightSlider" class="heightSlider" min="165" max="195" step="5" value="185">
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span>Поворот человека</span><b id="rotationValue">0°</b></div>
+    <input type="range" id="rotationSlider" class="heightSlider" min="0" max="360" step="15" value="0">
+  </div>
+
+  <div class="panel-title">🎨 Отделка</div>
+  <div id="finishRows"></div>
+
+  <div class="divider"></div>
+
+  <div class="row">
+    <button class="btn" id="btnShot"><span class="ico">📷</span> Снимок</button>
+    <button class="btn" id="btnShare"><span class="ico">🔗</span> Поделиться</button>
+  </div>
+
+  <button class="btn" id="btnReset"><span class="ico">↺</span> Сброс</button>
+
+  <label class="color-row">
+    <span>Цвет фона</span>
+    <input type="color" id="bgColor" value="#0f1116">
+  </label>
+
+  <button class="btn" id="btnPrice" style="display:none;"><span class="ico">💰</span> Расчёт стоимости</button>
+</aside>
+
+<div class="info" id="info">
+  <div class="info-head">Модель</div>
+  <div class="info-row"><span>Файл</span><b id="iFile">—</b></div>
+  <div class="info-row"><span>Объектов</span><b id="iMeshes">0</b></div>
+  <div class="info-row"><span>Вершин</span><b id="iVerts">0</b></div>
+  <div class="info-row"><span>Треугольников</span><b id="iTris">0</b></div>
+  <div class="info-row"><span>Габариты</span><b id="iSize">—</b></div>
+  <div class="info-row" id="animRow" style="display:none"><span>Анимаций</span><b id="iAnims">0</b></div>
+</div>
+
+<div class="loading" id="loading">
+  <div>
+    <div class="spinner"></div>
+    <p id="loadingText">Загрузка модели…</p>
+  </div>
+</div>
+
+<div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+<div class="mode-hint ruler" id="rulerHint">📏 Режим линейки: тапните по двум точкам модели</div>
+<div class="mode-hint human" id="humanHint">🧍 Тапните по ступени, чтобы поставить человечка</div>
+<div class="toast" id="toast"></div>
+
+<div class="price-modal-overlay" id="priceModalOverlay">
+  <div class="price-modal">
+    <div class="price-modal-header">
+      <div>
+        <span class="title">💰 Расчёт стоимости</span>
+        <span class="subtitle" id="priceModalSubtitle">—</span>
+      </div>
+      <button class="price-modal-close" id="priceModalClose" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="price-modal-body" id="priceModalBody"></div>
+    <div class="price-modal-footer">
+      <button class="btn" id="priceModalCloseBtn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" multiple
+       accept=".dae,.xml,image/*,.jpg,.jpeg,.png,.gif,.bmp,.tga,.webp"
+       style="display:none">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script><script type="module">
+import * as THREE from 'three';
+import { OrbitControls }  from 'three/addons/controls/OrbitControls.js';
+import { ColladaLoader }  from 'three/addons/loaders/ColladaLoader.js';
+import { GLTFLoader }     from 'three/addons/loaders/GLTFLoader.js';
+
+/* ═══════════════════════════════════════════════════════════════
+   ★ ЗДЕСЬ МЕНЯЕТЕ ИМЯ МОДЕЛИ ★
+   ═══════════════════════════════════════════════════════════════ */
+const MODEL_FILE = 'Korobitsyno.dae';
+const UNIT_SCALE = 1.0;
+const HUMAN_FILE = 'human.glb';
+
+/* ═══════════════════════════════════════════════════════════════
+   СПИСОК ТЕКСТУР ДЛЯ ПАНЕЛИ «ОТДЕЛКА» — только 4 материала
+   ═══════════════════════════════════════════════════════════════ */
+const TEXTURE_LIST = [
+  { file: 'con_pine.bmp',  name: 'Сосна' },
+  { file: 'con_bok.bmp',   name: 'Бук' },
+  { file: 'con_ash.bmp',   name: 'Ясень' },
+  { file: 'con_oak.bmp',   name: 'Дуб' }
+];
+
+/* Категории для панели отделки */
+const FINISH_CATEGORIES = [
+  { key: 'treads',    label: 'Ступени' },
+  { key: 'risers',    label: 'Подступенки' },
+  { key: 'stringers', label: 'Тетивы' },
+  { key: 'handrail',  label: 'Поручень' },
+  { key: 'baluster',  label: 'Балясины' },
+  { key: 'posts',     label: 'Столбы' },
+  { key: 'covering',  label: 'Панель перекрытия' }
+];
+
+/* ---------- DOM ---------- */
+const canvas      = document.getElementById('canvas');
+const loadingEl   = document.getElementById('loading');
+const loadingTxt  = document.getElementById('loadingText');
+const toastEl     = document.getElementById('toast');
+const infoEl      = document.getElementById('info');
+const panelEl     = document.getElementById('panel');
+const panelToggle = document.getElementById('panelToggle');
+const fileInput   = document.getElementById('fileInput');
+const progress    = document.getElementById('progress');
+const progressBar = document.getElementById('progressBar');
+const rulerHint   = document.getElementById('rulerHint');
+const humanHint   = document.getElementById('humanHint');
+const heightSlider= document.getElementById('heightSlider');
+const heightValue = document.getElementById('heightValue');
+const finishRows  = document.getElementById('finishRows');
+
+const priceOverlay  = document.getElementById('priceModalOverlay');
+const priceBody     = document.getElementById('priceModalBody');
+const priceSubtitle = document.getElementById('priceModalSubtitle');
+const priceBtn      = document.getElementById('btnPrice');
+
+const ui = {
+  file:   document.getElementById('iFile'),
+  meshes: document.getElementById('iMeshes'),
+  verts:  document.getElementById('iVerts'),
+  tris:   document.getElementById('iTris'),
+  size:   document.getElementById('iSize'),
+  anims:  document.getElementById('iAnims'),
+  animRow:document.getElementById('animRow'),
+};
+
+function isMobile() { return window.matchMedia('(max-width:640px)').matches; }
+
+/* ---------- Рендерер ---------- */
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0f1116');
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+camera.position.set(4, 3, 5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.9;
+controls.panSpeed = 0.8;
+controls.zoomSpeed = 1.0;
+controls.screenSpacePanning = true;
+controls.autoRotateSpeed = 1.6;
+
+controls.addEventListener('start', () => {
+  if (isMobile() && panelEl.classList.contains('open')) {
+    panelEl.classList.remove('open');
+    panelToggle.classList.remove('active');
+  }
+});
+
+scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x2a2f3a, 1.6));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.6);
+keyLight.position.set(5, 9, 7);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.bias = -0.0006;
+keyLight.shadow.normalBias = 0.02;
+scene.add(keyLight, keyLight.target);
+
+const fillLight = new THREE.DirectionalLight(0xa8c4ff, 0.9);
+fillLight.position.set(-7, 4, -6);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+rimLight.position.set(0, -6, -4);
+scene.add(rimLight);
+
+/* ---------- Сетка ---------- */
+let gridHelper = null;
+let gridVisible = false;
+
+function buildGrid(radius, yPos) {
+  if (gridHelper) {
+    scene.remove(gridHelper);
+    gridHelper.geometry.dispose();
+    gridHelper.material.dispose();
+  }
+  const size = Math.max(radius * 6, 1);
+  gridHelper = new THREE.GridHelper(size, 20, 0x4a5568, 0x272c37);
+  gridHelper.material.transparent = true;
+  gridHelper.material.opacity = 0.55;
+  gridHelper.material.depthWrite = false;
+  gridHelper.position.y = yPos;
+  gridHelper.visible = gridVisible;
+  scene.add(gridHelper);
+}
+
+/* ---------- Состояние ---------- */
+let currentModel = null;
+let currentMixer = null;
+let objectUrls   = [];
+const fileMap    = new Map();
+
+const elementGroups = {
+  treads: [], risers: [], stringers: [],
+  handrail: [], baluster: [], posts: [],
+  wall: [], covering: [], floor: [],
+};
+
+const elementVisible = {
+  treads: true, risers: true, stringers: true,
+  handrail: true, baluster: true, posts: true,
+  wall: true, covering: true, floor: true,
+};
+
+let glassWalls = true;
+
+const WALL_OPACITY    = 0.15;
+const WINDOW_OPACITY  = 0.55;
+const OPENING_OPACITY = 0.2;
+
+/* ---------- Кэш текстур ---------- */
+const textureCache = new Map();
+const texLoader = new THREE.TextureLoader();
+
+function getTexture(file) {
+  if (textureCache.has(file)) return textureCache.get(file);
+  const tex = texLoader.load(file);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  textureCache.set(file, tex);
+  return tex;
+}
+
+const originalMaterialState = new Map();
+
+const currentFinish = {
+  treads: null, risers: null, stringers: null,
+  handrail: null, baluster: null, posts: null,
+};
+
+/* ---------- price.json ---------- */
+let priceData = null;
+
+/* ---------- Линейка ---------- */
+let rulerMode = false;
+let rulerPoints = [];
+const rulerGroup = new THREE.Group();
+scene.add(rulerGroup);
+
+const rulerLineMat = new THREE.LineBasicMaterial({ color: 0xff7043 });
+const rulerDotMat  = new THREE.MeshBasicMaterial({ color: 0xff9f43 });
+const rulerDotGeo  = new THREE.SphereGeometry(0.03, 12, 12);
+
+const raycaster = new THREE.Raycaster();
+const pointer   = new THREE.Vector2();
+
+const allVertices = [];
+
+const snapDotGeo = new THREE.SphereGeometry(0.05, 16, 16);
+const snapDotMat = new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.85 });
+const snapDot = new THREE.Mesh(snapDotGeo, snapDotMat);
+snapDot.visible = false;
+snapDot.renderOrder = 1000;
+scene.add(snapDot);
+
+const SNAP_RADIUS = 0.05;
+
+/* ---------- Человечек ---------- */
+let humanMode = false;
+let humanHeight = 185;
+let humanRotation = 0;
+const humanGroup = new THREE.Group();
+humanGroup.visible = false;
+scene.add(humanGroup);
+
+let humanTemplate = null;
+let humanTemplateHeight = 1.8;
+
+const humanLoader = new GLTFLoader();
+humanLoader.load(HUMAN_FILE, (gltf) => {
+  humanTemplate = gltf.scene;
+  const box = new THREE.Box3().setFromObject(humanTemplate);
+  const size = box.getSize(new THREE.Vector3());
+  humanTemplateHeight = size.y > 0.001 ? size.y : 1.8;
+
+  humanTemplate.traverse((obj) => {
+    if (obj.isMesh) {
+      obj.castShadow = true; obj.receiveShadow = true;
+      if (obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((m) => {
+          if (m.color) m.color.setHex(0xff9f43);
+          m.emissive = new THREE.Color(0x3d2408);
+          m.emissiveIntensity = 0.15;
+          m.needsUpdate = true;
+        });
+      }
+    }
+  });
+  console.log('%c✔ ' + HUMAN_FILE + ' загружен', 'color:#31d0aa;font-weight:bold');
+  if (humanGroup.visible) makeHumanFigure(humanHeight);
+}, undefined, (err) => { console.warn('Не загружен human.glb:', err); });
+
+function setHumanHeight(cm) {
+  humanHeight = cm;
+  heightValue.textContent = cm + ' см';
+  makeHumanFigure(cm);
+}
+
+function makeHumanFigure(heightCm) {
+  while (humanGroup.children.length) {
+    const c = humanGroup.children.pop();
+    if (c.geometry) c.geometry.dispose();
+  }
+  const targetH = (heightCm / 100) * UNIT_SCALE;
+  if (!humanTemplate) {
+    const tempMat = new THREE.MeshStandardMaterial({ color: 0xff9f43, roughness: 0.5 });
+    const tempGeo = new THREE.CylinderGeometry(targetH * 0.08, targetH * 0.08, targetH, 12);
+    const tempMesh = new THREE.Mesh(tempGeo, tempMat);
+    tempMesh.position.y = targetH / 2;
+    tempMesh.castShadow = true;
+    humanGroup.add(tempMesh);
+    humanGroup.userData.topY = targetH;
+    return;
+  }
+  const clone = humanTemplate.clone(true);
+  const scale = targetH / humanTemplateHeight;
+  clone.scale.setScalar(scale);
+  clone.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(clone);
+  clone.position.y = -box.min.y;
+  clone.traverse((obj) => {
+    if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
+  });
+  humanGroup.add(clone);
+  humanGroup.add(makeHeightLabel(heightCm, targetH));
+  humanGroup.userData.topY = targetH;
+  humanGroup.rotation.y = (humanRotation * Math.PI) / 180;
+}
+
+function makeHeightLabel(text, yPos) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const dpr = 2, W = 200, H = 60;
+  c.width = W * dpr; c.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = 'rgba(20, 22, 30, 0.92)';
+  ctx.strokeStyle = '#31d0aa'; ctx.lineWidth = 2;
+  const r = 12;
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(W - r, 0);
+  ctx.quadraticCurveTo(W, 0, W, r); ctx.lineTo(W, H - r);
+  ctx.quadraticCurveTo(W, H, W - r, H); ctx.lineTo(r, H);
+  ctx.quadraticCurveTo(0, H, 0, H - r); ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#4be0bc';
+  ctx.font = '700 26px Inter, Segoe UI, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text + ' см', W / 2, H / 2 + 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(0, yPos + 0.15, 0);
+  sprite.scale.set(0.55, 0.165, 1);
+  return sprite;
+}
+
+/* ---------- Классификация ---------- */
+function classifyMaterial(matName) {
+  if (!matName) return null;
+  const n = matName.toUpperCase();
+  if (n.includes('TREAD'))         return 'treads';
+  if (n.includes('RISER'))         return 'risers';
+  if (n.includes('STRING'))        return 'stringers';
+  if (n.includes('HANDRAIL'))      return 'handrail';
+  if (n.includes('BOTTOMRAIL'))    return 'handrail';
+  if (n.includes('BALUSTER'))      return 'baluster';
+  if (n.includes('POST'))          return 'posts';
+  if (n.includes('BEGIN_WALL'))    return 'wall';
+  if (n.includes('BEGIN_OPENING')) return 'covering';
+  if (n.includes('PARKETT'))       return 'floor';
+  if (n.includes('ASH'))           return 'floor';
+  if (n.includes('OBJECT3D'))      return 'floor';
+  return null;
+}
+
+function isWindowTexture(matName) {
+  if (!matName) return false;
+  return matName.toLowerCase().includes('window');
+}
+
+/* ---------- LoadingManager ---------- */
+const manager = new THREE.LoadingManager();
+manager.setURLModifier((url) => {
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+  const decoded = decodeURIComponent(url).split('?')[0].split('#')[0];
+  const base = decoded.split('/').pop().toLowerCase();
+  if (fileMap.has(base)) return fileMap.get(base);
+  if (fileMap.has(decoded.toLowerCase())) return fileMap.get(decoded.toLowerCase());
+  return url;
+});
+
+/* ---------- Утилиты ---------- */
+function showProgress(v) {
+  if (v <= 0 || v >= 100) { progress.classList.remove('show'); return; }
+  progress.classList.add('show');
+  progressBar.style.width = v + '%';
+}
+function setLoading(show, text) {
+  if (text) loadingTxt.textContent = text;
+  loadingEl.classList.toggle('show', show);
+}
+
+let toastTimer = null;
+function showToast(msg, ok = false) {
+  toastEl.textContent = msg;
+  toastEl.classList.toggle('ok', ok);
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 4000);
+}
+
+const fmtInt = (n) => new Intl.NumberFormat('ru-RU').format(n);
+function fmtNum(v) {
+  const a = Math.abs(v);
+  if (a === 0) return '0';
+  if (a >= 100) return v.toFixed(0);
+  if (a >= 1) return v.toFixed(2);
+  if (a >= 0.01) return v.toFixed(3);
+  return v.toExponential(2);
+}
+
+function formatRub(n) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' ₽';
+}
+
+function disposeObject(root) {
+  const textures = new Set();
+  root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach((m) => {
+      if (!m) return;
+      for (const key in m) { const v = m[key]; if (v && v.isTexture) textures.add(v); }
+      m.dispose();
+    });
+  });
+  textures.forEach(t => t.dispose());
+}
+
+function findNearestVertex(point, radius) {
+  let bestDist = radius;
+  let bestVert = null;
+  for (let i = 0; i < allVertices.length; i++) {
+    const d = point.distanceTo(allVertices[i]);
+    if (d < bestDist) { bestDist = d; bestVert = allVertices[i]; }
+  }
+  return bestVert;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   КАЛЬКУЛЯТОР — вспомогательные функции
+   ═══════════════════════════════════════════════════════════════ */
+
+/* OBB — ориентированный bounding box */
+function computeOBB(vs) {
+  if (!vs || vs.length < 4) return null;
+  const c = new THREE.Vector3();
+  vs.forEach(v => c.add(v));
+  c.divideScalar(vs.length);
+
+  let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+  vs.forEach(v => {
+    const dx = v.x - c.x, dy = v.y - c.y, dz = v.z - c.z;
+    xx += dx * dx; xy += dx * dy; xz += dx * dz;
+    yy += dy * dy; yz += dy * dz; zz += dz * dz;
+  });
+  const M = [xx, xy, xz, yy, yz, zz];
+
+  function mulM(v) {
+    return new THREE.Vector3(
+      M[0] * v.x + M[1] * v.y + M[2] * v.z,
+      M[1] * v.x + M[3] * v.y + M[4] * v.z,
+      M[2] * v.x + M[4] * v.y + M[5] * v.z
+    );
+  }
+
+  let v1 = new THREE.Vector3(1, 0.5, 0.3).normalize();
+  for (let i = 0; i < 100; i++) {
+    v1 = mulM(v1);
+    if (v1.length() < 1e-12) break;
+    v1.normalize();
+  }
+  const lam1 = v1.dot(mulM(v1));
+
+  const M2 = [
+    M[0] - lam1 * v1.x * v1.x, M[1] - lam1 * v1.x * v1.y, M[2] - lam1 * v1.x * v1.z,
+    M[3] - lam1 * v1.y * v1.y, M[4] - lam1 * v1.y * v1.z,
+    M[5] - lam1 * v1.z * v1.z
+  ];
+  function mulM2(v) {
+    return new THREE.Vector3(
+      M2[0] * v.x + M2[1] * v.y + M2[2] * v.z,
+      M2[1] * v.x + M2[3] * v.y + M2[4] * v.z,
+      M2[2] * v.x + M2[4] * v.y + M2[5] * v.z
+    );
+  }
+
+  let v2 = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(v1.dot(v2)) > 0.9) v2.set(1, 0, 0);
+  v2.sub(v1.clone().multiplyScalar(v2.dot(v1))).normalize();
+  for (let i = 0; i < 100; i++) {
+    v2 = mulM2(v2);
+    v2.sub(v1.clone().multiplyScalar(v2.dot(v1)));
+    if (v2.length() < 1e-12) break;
+    v2.normalize();
+  }
+  const v3 = new THREE.Vector3().crossVectors(v1, v2).normalize();
+
+  let min1 = Infinity, max1 = -Infinity;
+  let min2 = Infinity, max2 = -Infinity;
+  let min3 = Infinity, max3 = -Infinity;
+  vs.forEach(v => {
+    const d = v.clone().sub(c);
+    const p1 = d.dot(v1), p2 = d.dot(v2), p3 = d.dot(v3);
+    if (p1 < min1) min1 = p1; if (p1 > max1) max1 = p1;
+    if (p2 < min2) min2 = p2; if (p2 > max2) max2 = p2;
+    if (p3 < min3) min3 = p3; if (p3 > max3) max3 = p3;
+  });
+  const d1 = max1 - min1, d2 = max2 - min2, d3 = max3 - min3;
+  const dims = [d1, d2, d3].sort((a, b) => b - a);
+  return { area: dims[0] * dims[1], length: dims[0], volume: d1 * d2 * d3 };
+}
+
+/* Площадь поверхности меша */
+function meshSurfaceArea(obj) {
+  const geo = obj.geometry;
+  if (!geo) return 0;
+  const pos = geo.attributes.position;
+  if (!pos) return 0;
+  let total = 0;
+  const idx = geo.index;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  if (idx) {
+    for (let i = 0; i < idx.count; i += 3) {
+      a.fromBufferAttribute(pos, idx.getX(i));
+      b.fromBufferAttribute(pos, idx.getX(i + 1));
+      c.fromBufferAttribute(pos, idx.getX(i + 2));
+      total += new THREE.Vector3().subVectors(b, a)
+              .cross(new THREE.Vector3().subVectors(c, a)).length() * 0.5;
+    }
+  } else {
+    for (let i = 0; i < pos.count; i += 3) {
+      a.fromBufferAttribute(pos, i);
+      b.fromBufferAttribute(pos, i + 1);
+      c.fromBufferAttribute(pos, i + 2);
+      total += new THREE.Vector3().subVectors(b, a)
+              .cross(new THREE.Vector3().subVectors(c, a)).length() * 0.5;
+    }
+  }
+  return total;
+}
+
+function analyzeMesh(obj) {
+  const geo = obj.geometry;
+  if (!geo || !geo.attributes.position) return null;
+  const pos = geo.attributes.position;
+  obj.updateMatrixWorld(true);
+  const vs = [];
+  for (let i = 0; i < pos.count; i++) {
+    vs.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld));
+  }
+  const obb = computeOBB(vs);
+  if (!obb) return null;
+  return {
+    obbArea: obb.area,
+    obbLength: obb.length,
+    obbVolume: obb.volume,
+    surface: meshSurfaceArea(obj)
+  };
+}
+
+const meshAnalysisCache = new WeakMap();
+function getMeshAnalysis(obj) {
+  if (meshAnalysisCache.has(obj)) return meshAnalysisCache.get(obj);
+  const res = analyzeMesh(obj);
+  meshAnalysisCache.set(obj, res);
+  return res;
+}/* ═══════════════════════════════════════════════════════════════
+   ЗАГРУЗКА МОДЕЛИ
+   ═══════════════════════════════════════════════════════════════ */
+function handleFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const daeFile = files.find(f => /\.(dae|xml)$/i.test(f.name));
+  if (!daeFile) { showToast('Не найден файл формата .dae'); return; }
+
+  objectUrls.forEach(u => URL.revokeObjectURL(u));
+  objectUrls = [];
+  fileMap.clear();
+
+  for (const f of files) {
+    if (f === daeFile) continue;
+    const url = URL.createObjectURL(f);
+    objectUrls.push(url);
+    fileMap.set(f.name.toLowerCase(), url);
+    if (f.webkitRelativePath) fileMap.set(f.webkitRelativePath.toLowerCase(), url);
+  }
+  const daeUrl = URL.createObjectURL(daeFile);
+  objectUrls.push(daeUrl);
+  loadCollada(daeUrl, daeFile.name);
+}
+
+function loadCollada(url, fileName) {
+  setLoading(true, `Загрузка «${fileName}»…`);
+  showProgress(5);
+
+  for (const k in elementGroups) elementGroups[k] = [];
+  clearRuler();
+  allVertices.length = 0;
+  originalMaterialState.clear();
+
+  const loader = new ColladaLoader(manager);
+  loader.load(url,
+    (collada) => {
+      setLoading(false);
+      showProgress(0);
+      const model = collada.scene;
+      if (!model) { showToast('Файл не содержит сцены'); return; }
+
+      if (currentModel) {
+        scene.remove(currentModel);
+        disposeObject(currentModel);
+        currentModel = null;
+      }
+      if (currentMixer) { currentMixer.stopAllAction(); currentMixer = null; }
+
+      let meshCount = 0, vertCount = 0, triCount = 0;
+      const seenGeom = new Set();
+
+      model.traverse((obj) => {
+        if (!obj.isMesh && !obj.isSkinnedMesh) return;
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+        obj.frustumCulled = false;
+
+        if (obj.geometry && !seenGeom.has(obj.geometry)) {
+          seenGeom.add(obj.geometry);
+          const g = obj.geometry;
+          const pos = g.attributes.position;
+          if (pos) vertCount += pos.count;
+          triCount += g.index ? g.index.count / 3 : (pos ? pos.count / 3 : 0);
+        }
+        meshCount++;
+
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((m) => {
+          if (!m) return;
+          ['map','emissiveMap','specularMap','normalMap','aoMap','alphaMap'].forEach((k) => {
+            if (m[k] && m[k].isTexture) {
+              if (k === 'map' || k === 'emissiveMap') m[k].colorSpace = THREE.SRGBColorSpace;
+              m[k].anisotropy = renderer.capabilities.getMaxAnisotropy();
+            }
+          });
+          m.needsUpdate = true;
+        });
+
+        const matName = mats[0] && mats[0].name ? mats[0].name : '';
+        const group = classifyMaterial(matName);
+        if (group) {
+          elementGroups[group].push(obj);
+          if (group === 'wall' && isWindowTexture(matName)) obj.userData.isWindow = true;
+        }
+
+        mats.forEach((m) => {
+          if (!m) return;
+          originalMaterialState.set(obj.uuid, {
+            map: m.map || null,
+            color: m.color ? m.color.getHex() : 0xffffff
+          });
+        });
+      });
+
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      if (box.isEmpty()) { showToast('Модель не содержит геометрии'); return; }
+
+      const size   = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      model.updateMatrixWorld(true);
+
+      // Вершины для привязки
+      const v = new THREE.Vector3();
+      const seenPos = new Set();
+      model.traverse((obj) => {
+        if (!obj.isMesh && !obj.isSkinnedMesh) return;
+        const g = obj.geometry;
+        if (!g || !g.attributes || !g.attributes.position) return;
+        const pos = g.attributes.position;
+        obj.updateMatrixWorld();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+          const key = v.x.toFixed(3) + '|' + v.y.toFixed(3) + '|' + v.z.toFixed(3);
+          if (!seenPos.has(key)) {
+            seenPos.add(key);
+            allVertices.push(v.clone());
+          }
+        }
+      });
+      console.log('Вершин для привязки:', allVertices.length);
+
+      const sphere = new THREE.Box3().setFromObject(model).getBoundingSphere(new THREE.Sphere());
+      const r = Math.max(sphere.radius, 0.0001);
+
+      const sc = keyLight.shadow.camera;
+      sc.left = -r * 1.6; sc.right = r * 1.6;
+      sc.top = r * 1.6; sc.bottom = -r * 1.6;
+      sc.near = r * 0.05; sc.far = r * 30;
+      sc.updateProjectionMatrix();
+      keyLight.position.copy(new THREE.Vector3(1, 1.7, 1).normalize().multiplyScalar(r * 6));
+      keyLight.target.position.set(0, 0, 0);
+      keyLight.target.updateMatrixWorld();
+
+      buildGrid(r, -size.y / 2);
+
+      const clips = collada.animations || [];
+      if (clips.length) {
+        currentMixer = new THREE.AnimationMixer(model);
+        clips.forEach((clip) => {
+          const a = currentMixer.clipAction(clip);
+          a.setLoop(THREE.LoopRepeat, Infinity);
+          a.play();
+        });
+      }
+
+      currentModel = model;
+      scene.add(currentModel);
+
+      applyElementVisibility();
+      applyGlassWalls();
+      setHumanHeight(humanHeight);
+      buildFinishPanel();
+
+      // Обновляем заголовок
+      const modelName = fileName.replace(/\.(dae|xml)$/i, '');
+      if (modelName) {
+        document.title = '3D Viewer — ' + modelName;
+        priceSubtitle.textContent = modelName;
+      }
+
+      ui.file.textContent   = fileName;
+      ui.meshes.textContent = fmtInt(meshCount);
+      ui.verts.textContent  = fmtInt(Math.round(vertCount));
+      ui.tris.textContent   = fmtInt(Math.round(triCount));
+      ui.size.textContent   = `${fmtNum(size.x)} × ${fmtNum(size.y)} × ${fmtNum(size.z)}`;
+
+      if (clips.length) {
+        ui.animRow.style.display = 'flex';
+        ui.anims.textContent = fmtInt(clips.length);
+      } else {
+        ui.animRow.style.display = 'none';
+      }
+
+            infoEl.classList.add('show');
+      panelEl.classList.remove('hidden');
+      fitCamera();
+      setTimeout(runAreaDiagnostics, 500);
+    },
+    
+    (evt) => {
+      if (evt && evt.total) {
+        const p = Math.round((evt.loaded / evt.total) * 100);
+        showProgress(p);
+        setLoading(true, `Загрузка… ${p}%`);
+      }
+    },
+    (err) => {
+      setLoading(false);
+      showProgress(0);
+      console.error(err);
+      showToast('Ошибка загрузки. Проверьте, что это корректный .dae');
+    }
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ПАНЕЛЬ ОТДЕЛКИ
+   ═══════════════════════════════════════════════════════════════ */
+function buildFinishPanel() {
+  finishRows.innerHTML = '';
+
+  FINISH_CATEGORIES.forEach((cat) => {
+    const row = document.createElement('div');
+    row.className = 'finish-row';
+    row.dataset.key = cat.key;
+
+    const header = document.createElement('div');
+    header.className = 'finish-header';
+
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = cat.label;
+
+    const right = document.createElement('span');
+    right.className = 'value';
+
+    const valueText = document.createElement('span');
+    valueText.className = 'finish-current';
+    valueText.textContent = 'Как в проекте';
+
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.textContent = '▼';
+
+    right.appendChild(valueText);
+    right.appendChild(arrow);
+    header.appendChild(label);
+    header.appendChild(right);
+
+    const options = document.createElement('div');
+    options.className = 'finish-options';
+
+    const optOriginal = document.createElement('button');
+    optOriginal.className = 'finish-option selected';
+    optOriginal.dataset.file = '';
+    optOriginal.dataset.name = 'Как в проекте';
+    optOriginal.innerHTML = '<span class="swatch" style="background:#1a1d25;"></span>Как в проекте';
+    options.appendChild(optOriginal);
+
+    TEXTURE_LIST.forEach((t) => {
+      const opt = document.createElement('button');
+      opt.className = 'finish-option';
+      opt.dataset.file = t.file;
+      opt.dataset.name = t.name;
+      opt.innerHTML = '<span class="swatch" style="background-image:url(' + t.file + ');"></span>' + t.name;
+      options.appendChild(opt);
+    });
+
+    row.appendChild(header);
+    row.appendChild(options);
+
+    header.addEventListener('click', () => {
+      const isOpen = row.classList.contains('open');
+      finishRows.querySelectorAll('.finish-row.open').forEach((r) => {
+        if (r !== row) r.classList.remove('open');
+      });
+      row.classList.toggle('open', !isOpen);
+    });
+
+    options.addEventListener('click', (e) => {
+      const btn = e.target.closest('.finish-option');
+      if (!btn) return;
+
+      const file = btn.dataset.file;
+      const name = btn.dataset.name;
+
+      currentFinish[cat.key] = file ? { file, name } : null;
+
+      options.querySelectorAll('.finish-option').forEach((o) => o.classList.remove('selected'));
+      btn.classList.add('selected');
+      valueText.textContent = file ? name : 'Как в проекте';
+      row.classList.remove('open');
+
+      applyFinish(cat.key);
+    });
+
+    finishRows.appendChild(row);
+  });
+}
+
+function applyFinish(categoryKey) {
+  const meshes = elementGroups[categoryKey] || [];
+  const choice = currentFinish[categoryKey];
+
+  meshes.forEach((obj) => {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    const orig = originalMaterialState.get(obj.uuid);
+
+    mats.forEach((m) => {
+      if (!m) return;
+      if (!choice) {
+        if (orig) {
+          m.map = orig.map;
+          if (m.color) m.color.setHex(orig.color);
+        }
+      } else {
+        m.map = getTexture(choice.file);
+        if (m.color) m.color.setHex(0xffffff);
+      }
+      m.needsUpdate = true;
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   КАЛЬКУЛЯТОР
+   ═══════════════════════════════════════════════════════════════ */
+function getMaterialForKey(key) {
+  const chosen = currentFinish[key];
+  if (!chosen || !chosen.file) return 'pine';
+  const mats = priceData && priceData.materials ? priceData.materials : {};
+  for (const matKey in mats) {
+    const t = mats[matKey].textures || [];
+    if (t.indexOf(chosen.file) !== -1) return matKey;
+  }
+  return 'pine';
+}
+
+function getMaterialInfo(matKey) {
+  const mats = priceData && priceData.materials ? priceData.materials : {};
+  return mats[matKey] || mats.pine || { name: 'Сосна', multiplier: 1 };
+}
+
+function calculatePrice() {
+  const result = { categories: [], materialTotal: 0, paintTotal: 0, total: 0 };
+  if (!bomData || !priceData || !priceData.categories) return result;
+
+  const paintPrice = (priceData.paint && priceData.paint.price_m2) || 0;
+
+  const typeMap = {
+    'Step':       'treads',
+    'Riser':      'risers',
+    'String':     'stringers',
+    'Newel':      'posts',
+    'Handrail':   'handrail',
+    'Baluster':   'baluster',
+    'Covering':   'covering',
+    'Bottomrail': 'handrail'
+  };
+
+  const grouped = {};
+  bomData.items.forEach(d => {
+    const catKey = typeMap[d.type];
+    if (!catKey) return;
+    if (!grouped[catKey]) grouped[catKey] = [];
+    grouped[catKey].push(d);
+  });
+
+  for (const catKey in grouped) {
+    const cat = priceData.categories[catKey];
+    if (!cat) continue;
+
+    const items = grouped[catKey];
+    const matKey = getMaterialForKey(catKey);
+    const matInfo = getMaterialInfo(matKey);
+    const unitPrice = (cat.prices && cat.prices[matKey]) || 0;
+
+    let qty = 0;
+    let paintArea = 0;
+    let formula = '';
+
+    if (cat.method === 'm2') {
+      items.forEach(d => {
+        qty += (d.W * d.L) / 1e6;
+        paintArea += (2 * (d.W + d.T) * d.L + 2 * d.W * d.T) / 1e6;
+      });
+      formula = qty.toFixed(3) + ' м² × ' + unitPrice;
+
+    } else if (cat.method === 'length') {
+      const extra = (cat.extra_mm || 0) / 1000;
+      items.forEach(d => {
+        const Lp = d.L / 1000 + extra;
+        qty += Lp;
+        paintArea += (2 * (d.W + d.T) * (Lp * 1000)) / 1e6;
+      });
+      formula = qty.toFixed(2) + ' м (' + items.length + ' шт) × ' + unitPrice;
+
+    } else if (cat.method === 'count') {
+      qty = items.length;
+      items.forEach(d => {
+        paintArea += (Math.PI * d.W * d.L) / 1e6;
+      });
+      formula = qty + ' шт × ' + unitPrice;
+    }
+
+    result.categories.push({
+      name: cat.name,
+      materialName: matInfo.name,
+      formula: formula,
+      materialCost: qty * unitPrice,
+      paintCost: paintArea * paintPrice
+    });
+
+    result.materialTotal += qty * unitPrice;
+    result.paintTotal += paintArea * paintPrice;
+  }
+
+  result.total = result.materialTotal + result.paintTotal;
+  return result;
+}
+
+function buildPriceModal() {
+  if (!priceData) {
+    priceBody.innerHTML = '<div class="price-empty">Файл price.json не найден</div>';
+    return;
+  }
+  const result = calculatePrice();
+  if (!result.categories.length) {
+    priceBody.innerHTML = '<div class="price-empty">Нет данных для расчёта</div>';
+    return;
+  }
+  priceBody.innerHTML = '';
+
+  result.categories.forEach((cat) => {
+    const block = document.createElement('div');
+    block.className = 'price-cat';
+    block.innerHTML =
+      '<div class="price-cat-name">' +
+        '<span>' + cat.name + '</span>' +
+        '<span class="material">' + cat.materialName + '</span>' +
+      '</div>' +
+      '<div class="price-cat-formula">' + cat.formula + '</div>' +
+      '<div class="price-cat-result">' + formatRub(cat.materialCost) + '</div>';
+    priceBody.appendChild(block);
+  });
+
+  const totals = document.createElement('div');
+  totals.className = 'price-totals';
+  totals.innerHTML =
+    '<div class="price-totals-row"><span>Материал</span><span>' + formatRub(result.materialTotal) + '</span></div>' +
+    '<div class="price-totals-row"><span>Покраска</span><span>' + formatRub(result.paintTotal) + '</span></div>' +
+    '<div class="price-totals-row total"><span>ИТОГО</span><span>' + formatRub(result.total) + '</span></div>';
+  priceBody.appendChild(totals);
+}
+
+function openPriceModal() {
+  buildPriceModal();
+  priceOverlay.classList.add('show');
+}
+function closePriceModal() {
+  priceOverlay.classList.remove('show');
+}
+
+/* ---------- Видимость ---------- */
+function applyElementVisibility() {
+  for (const key in elementGroups) {
+    const visible = elementVisible[key];
+    elementGroups[key].forEach((obj) => { obj.visible = visible; });
+  }
+}
+
+function applyGlassWalls() {
+  elementGroups.wall.forEach((obj) => {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    const isWin = obj.userData.isWindow;
+    mats.forEach((m) => {
+      if (!m) return;
+      if (glassWalls) {
+        m.transparent = true;
+        m.opacity = isWin ? WINDOW_OPACITY : WALL_OPACITY;
+        m.depthWrite = false;
+      } else {
+        m.transparent = false;
+        m.opacity = 1;
+        m.depthWrite = true;
+      }
+      m.needsUpdate = true;
+    });
+  });
+ 
+}
+
+/* ---------- Камера ---------- */
+function fitCamera() {
+  if (!currentModel) return;
+  const box = new THREE.Box3().setFromObject(currentModel);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const radius = Math.max(sphere.radius, 0.0001);
+  const fovRad = THREE.MathUtils.degToRad(camera.fov);
+  const zoomFactor = isMobile() ? 0.78 : 1.18;
+  const dist = (radius / Math.sin(fovRad / 2)) * zoomFactor;
+  const dir = new THREE.Vector3(1, 0.62, 1).normalize();
+  camera.position.copy(sphere.center).addScaledVector(dir, dist);
+  camera.near = Math.max(radius / 500, 0.001);
+  camera.far = radius * 800;
+  camera.updateProjectionMatrix();
+  controls.target.copy(sphere.center);
+  controls.minDistance = radius * 0.05;
+  controls.maxDistance = radius * 60;
+  controls.update();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ЛИНЕЙКА
+   ═══════════════════════════════════════════════════════════════ */
+function setRulerMode(on) {
+  rulerMode = on;
+  document.getElementById('btnRuler').classList.toggle('ruler-on', on);
+  canvas.classList.toggle('ruler-mode', on);
+  rulerHint.classList.toggle('show', on);
+  if (on && humanMode) setHumanMode(false);
+  if (!on) {
+    if (rulerPoints.length === 1) rulerPoints = [];
+    snapDot.visible = false;
+  }
+}
+
+function clearRuler() {
+  rulerPoints = [];
+  while (rulerGroup.children.length) {
+    const c = rulerGroup.children.pop();
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) {
+      if (c.material.map) c.material.map.dispose();
+      c.material.dispose();
+    }
+  }
+}
+
+function makeLabelSprite(text) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const dpr = 2, W = 240, H = 70;
+  c.width = W * dpr; c.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = 'rgba(20, 22, 30, 0.92)';
+  ctx.strokeStyle = '#ff7043'; ctx.lineWidth = 2;
+  const r = 14;
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(W - r, 0);
+  ctx.quadraticCurveTo(W, 0, W, r); ctx.lineTo(W, H - r);
+  ctx.quadraticCurveTo(W, H, W - r, H); ctx.lineTo(r, H);
+  ctx.quadraticCurveTo(0, H, 0, H - r); ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ff9f43';
+  ctx.font = '700 26px Inter, Segoe UI, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, W / 2, H / 2 + 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.7, 0.2, 1);
+  return sprite;
+}
+
+function addMeasurePoint(point) {
+  const dot = new THREE.Mesh(rulerDotGeo, rulerDotMat);
+  dot.position.copy(point);
+  dot.renderOrder = 999;
+  rulerGroup.add(dot);
+}
+
+function addMeasureLine(p1, p2) {
+  const geo = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
+  const line = new THREE.Line(geo, rulerLineMat);
+  line.renderOrder = 998;
+  rulerGroup.add(line);
+}
+
+function formatDistance(distance) {
+  const meters = distance * UNIT_SCALE;
+  return (meters * 1000).toFixed(0) + ' мм';
+}
+
+function handleRulerTap(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  if (!currentModel) return;
+  const hits = raycaster.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  let point = hits[0].point.clone();
+  const nearVert = findNearestVertex(point, SNAP_RADIUS);
+  if (nearVert) point = nearVert.clone();
+  rulerPoints.push(point);
+  addMeasurePoint(point);
+  if (rulerPoints.length === 2) {
+    const p1 = rulerPoints[0], p2 = rulerPoints[1];
+    addMeasureLine(p1, p2);
+    const dist = p1.distanceTo(p2);
+    const sprite = makeLabelSprite(formatDistance(dist));
+    const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+    sprite.position.copy(mid);
+    rulerGroup.add(sprite);
+    rulerPoints = [];
+  }
+}
+
+function handleRulerHover(clientX, clientY) {
+  if (!rulerMode || !currentModel) { snapDot.visible = false; return; }
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(currentModel, true);
+  if (!hits.length) { snapDot.visible = false; return; }
+  const point = hits[0].point.clone();
+  const nearVert = findNearestVertex(point, SNAP_RADIUS);
+  if (nearVert) {
+    snapDot.position.copy(nearVert);
+    snapDot.visible = true;
+    snapDotMat.color.setHex(0xffd166);
+    snapDotMat.opacity = 0.85;
+  } else {
+    snapDot.position.copy(point);
+    snapDot.visible = true;
+    snapDotMat.color.setHex(0xffffff);
+    snapDotMat.opacity = 0.4;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ЧЕЛОВЕЧЕК
+   ═══════════════════════════════════════════════════════════════ */
+function setHumanMode(on) {
+  humanMode = on;
+  document.getElementById('btnHuman').classList.toggle('human-on', on);
+  canvas.classList.toggle('human-mode', on);
+  humanHint.classList.toggle('show', on);
+  if (on && rulerMode) setRulerMode(false);
+}
+
+function placeHuman(clientX, clientY) {
+  if (!currentModel) return;
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  humanGroup.position.copy(hits[0].point.clone());
+  humanGroup.visible = true;
+}
+
+/* ---------- Указатель ---------- */
+let pointerDown = false;
+let downX = 0, downY = 0;
+
+canvas.addEventListener('pointerdown', (e) => {
+  pointerDown = true;
+  downX = e.clientX;
+  downY = e.clientY;
+});
+canvas.addEventListener('pointerup', (e) => {
+  if (!pointerDown) return;
+  pointerDown = false;
+  const dx = Math.abs(e.clientX - downX);
+  const dy = Math.abs(e.clientY - downY);
+  if (dx < 6 && dy < 6) {
+    if (rulerMode) handleRulerTap(e.clientX, e.clientY);
+    else if (humanMode) placeHuman(e.clientX, e.clientY);
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (rulerMode) handleRulerHover(e.clientX, e.clientY);
+});
+canvas.addEventListener('pointerleave', () => { snapDot.visible = false; });
+
+/* ═══════════════════════════════════════════════════════════════
+   ИНИЦИАЛИЗАЦИЯ
+   ═══════════════════════════════════════════════════════════════ */
+if (isMobile()) {
+  panelEl.classList.remove('hidden');
+  panelEl.classList.remove('open');
+} else {
+  panelEl.classList.remove('hidden');
+}
+
+panelToggle.addEventListener('click', () => {
+  const isOpen = panelEl.classList.toggle('open');
+  panelToggle.classList.toggle('active', isOpen);
+});
+
+/* ---------- Кнопки ---------- */
+document.getElementById('btnOpen').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => { handleFiles(e.target.files); fileInput.value = ''; });
+document.getElementById('btnFit').addEventListener('click', fitCamera);
+
+document.getElementById('btnRotate').addEventListener('click', (e) => {
+  controls.autoRotate = !controls.autoRotate;
+  e.currentTarget.classList.toggle('active', controls.autoRotate);
+});
+
+function bindElementButton(id, key) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    elementVisible[key] = !elementVisible[key];
+    btn.classList.toggle('active', elementVisible[key]);
+    applyElementVisibility();
+  });
+}
+
+bindElementButton('el_treads',    'treads');
+bindElementButton('el_risers',    'risers');
+bindElementButton('el_stringers', 'stringers');
+bindElementButton('el_handrail',  'handrail');
+bindElementButton('el_baluster',  'baluster');
+bindElementButton('el_posts',     'posts');
+bindElementButton('el_wall',      'wall');
+bindElementButton('el_opening',   'opening');
+bindElementButton('el_covering',  'covering');
+bindElementButton('el_floor',     'floor');
+
+document.getElementById('btnGlass').addEventListener('click', (e) => {
+  glassWalls = !glassWalls;
+  e.currentTarget.classList.toggle('active', glassWalls);
+  applyGlassWalls();
+});
+
+/* ---------- Линейка ---------- */
+document.getElementById('btnRuler').addEventListener('click', () => setRulerMode(!rulerMode));
+document.getElementById('btnRulerClear').addEventListener('click', () => {
+  clearRuler();
+  showToast('Замеры очищены', true);
+});
+
+/* ---------- Человечек ---------- */
+document.getElementById('btnHuman').addEventListener('click', () => {
+  setHumanMode(!humanMode);
+  if (humanMode && !humanGroup.visible && currentModel) {
+    showToast('Тапните по ступени, чтобы поставить человечка', true);
+  }
+});
+document.getElementById('btnHumanRemove').addEventListener('click', () => {
+  humanGroup.visible = false;
+  setHumanMode(false);
+  showToast('Человечек убран', true);
+});
+heightSlider.addEventListener('input', (e) => setHumanHeight(parseInt(e.target.value, 10)));
+
+const rotationSlider = document.getElementById('rotationSlider');
+const rotationValue  = document.getElementById('rotationValue');
+rotationSlider.addEventListener('input', (e) => {
+  humanRotation = parseInt(e.target.value, 10);
+  rotationValue.textContent = humanRotation + '°';
+  humanGroup.rotation.y = (humanRotation * Math.PI) / 180;
+});
+
+/* ---------- Сброс ---------- */
+document.getElementById('btnReset').addEventListener('click', () => {
+  for (const k in elementVisible) elementVisible[k] = true;
+  for (const k in elementVisible) {
+    const btn = document.getElementById('el_' + k);
+    if (btn) btn.classList.add('active');
+  }
+  glassWalls = true;
+  document.getElementById('btnGlass').classList.add('active');
+  controls.autoRotate = false;
+  document.getElementById('btnRotate').classList.remove('active');
+  applyElementVisibility();
+  applyGlassWalls();
+
+  if (rulerMode) setRulerMode(false);
+  if (humanMode) setHumanMode(false);
+  humanGroup.visible = false;
+  humanRotation = 0;
+  rotationSlider.value = 0;
+  rotationValue.textContent = '0°';
+  humanGroup.rotation.y = 0;
+
+  for (const k in currentFinish) {
+    currentFinish[k] = null;
+    applyFinish(k);
+  }
+  buildFinishPanel();
+
+  const bg = '#0f1116';
+  document.getElementById('bgColor').value = bg;
+  scene.background.set(bg);
+  if (currentModel) fitCamera();
+});
+
+/* ---------- Снимок ---------- */
+document.getElementById('btnShot').addEventListener('click', () => {
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `view-${Date.now()}.png`;
+  a.click();
+  showToast('Снимок сохранён', true);
+});
+
+/* ---------- Поделиться ---------- */
+document.getElementById('btnShare').addEventListener('click', async () => {
+  const url = location.origin + location.pathname + location.search;
+  const title = document.title || '3D Viewer';
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: 'Посмотрите 3D-модель', url });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Ссылка скопирована в буфер обмена', true);
+  } catch {
+    prompt('Скопируйте ссылку вручную:', url);
+  }
+});
+
+document.getElementById('bgColor').addEventListener('input', (e) => {
+  scene.background.set(e.target.value);
+});
+
+/* ---------- Кнопка расчёта ---------- */
+priceBtn.addEventListener('click', openPriceModal);
+document.getElementById('priceModalClose').addEventListener('click', closePriceModal);
+document.getElementById('priceModalCloseBtn').addEventListener('click', closePriceModal);
+priceOverlay.addEventListener('click', (e) => {
+  if (e.target === priceOverlay) closePriceModal();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && priceOverlay.classList.contains('show')) closePriceModal();
+});
+
+/* ---------- Drag & Drop ---------- */
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; });
+window.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+window.addEventListener('dragleave', (e) => { e.preventDefault(); dragDepth = Math.max(0, dragDepth - 1); });
+window.addEventListener('drop', (e) => {
+  e.preventDefault(); dragDepth = 0;
+  if (e.dataTransfer && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+/* ---------- Горячие клавиши ---------- */
+window.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+  switch (e.key.toLowerCase()) {
+    case 'f': document.getElementById('btnFit').click(); break;
+    case 'r': document.getElementById('btnRotate').click(); break;
+    case 'm': document.getElementById('btnRuler').click(); break;
+    case 'h': document.getElementById('btnHuman').click(); break;
+  }
+});
+
+/* ---------- Ресайз ---------- */
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+/* ---------- Цикл ---------- */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (currentMixer) currentMixer.update(dt);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ---------- Загрузка price.json ---------- */
+  /* ═══════════════════════════════════════════════════════════════
+   BOM (XML из Staircon)
+   ═══════════════════════════════════════════════════════════════ */
+let bomData = null;
+
+function parseBOM(xmlText) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, 'application/xml');
+  const details = xml.querySelectorAll('detail');
+  const items = [];
+
+  details.forEach((d) => {
+    const typeNode = d.querySelector('type');
+    const typeId = typeNode ? typeNode.getAttribute('id') : '';
+    if (!typeId || typeId === 'Bolt') return;
+
+    const dim = d.querySelector('dim');
+    if (!dim) return;
+
+    const T = parseFloat(dim.querySelector('thickness')?.textContent) || 0;
+    const W = parseFloat(dim.querySelector('width')?.textContent) || 0;
+    const L = parseFloat(dim.querySelector('length')?.textContent) || 0;
+    if (!L) return;
+
+    const matNode = d.querySelector('material');
+    const mat = matNode ? (matNode.textContent || '').trim() : '';
+
+    items.push({ type: typeId, T, W, L, mat });
+  });
+
+  return { items };
+}
+
+async function loadBOM() {
+  const bomFile = MODEL_FILE.replace(/\.(dae|xml)$/i, '.xml');
+  try {
+    const r = await fetch(bomFile, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const buf = await r.arrayBuffer();
+    const decoder = new TextDecoder('windows-1252');
+    const text = decoder.decode(buf);
+    bomData = parseBOM(text);
+    console.log('%c✔ BOM загружен: ' + bomData.items.length + ' деталей',
+                'color:#31d0aa;font-weight:bold');
+  } catch (err) {
+    console.log('BOM не найден (' + bomFile + '):', err.message);
+    bomData = null;
+  }
+}
+
+loadBOM();
+fetch('price.json', { cache: 'no-store' })
+  .then((r) => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then((data) => {
+    priceData = data;
+    priceBtn.style.display = 'inline-flex';
+    console.log('%c✔ price.json загружен', 'color:#31d0aa;font-weight:bold');
+  })
+  .catch((err) => {
+    console.log('price.json не найден:', err.message);
+  });
+
+/* ---------- Старт ---------- */
+resize();
+animate();
+
+if (MODEL_FILE) {
+  loadCollada(MODEL_FILE, MODEL_FILE);
+  const modelName = MODEL_FILE.replace(/\.(dae|xml)$/i, '');
+  if (modelName) {
+    document.title = '3D Viewer — ' + modelName;
+    priceSubtitle.textContent = modelName;
+  }
+}
+/* ═══════════════════════════════════════════════════════════════
+   ДИАГНОСТИКА — какие материалы есть в модели
+   ═══════════════════════════════════════════════════════════════ */
+function runAreaDiagnostics() {
+  if (!currentModel) return;
+
+  console.log('%c═══════════════════════════════════════════', 'color:#5b8cff');
+  console.log('%c ДИАГНОСТИКА МАТЕРИАЛОВ', 'color:#5b8cff;font-weight:bold;font-size:14px');
+  console.log('%c═══════════════════════════════════════════', 'color:#5b8cff');
+  console.log('');
+
+  const s = UNIT_SCALE;
+  const byMaterial = {};
+
+  currentModel.traverse((obj) => {
+    if (!obj.isMesh && !obj.isSkinnedMesh) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    const matName = mats[0] && mats[0].name ? mats[0].name : '(без имени)';
+
+    if (!byMaterial[matName]) {
+      byMaterial[matName] = { count: 0, obb: 0, surface: 0, samples: [] };
+    }
+    byMaterial[matName].count++;
+
+    const a = getMeshAnalysis(obj);
+    if (a) {
+      byMaterial[matName].obb += a.obbArea * s * s;
+      byMaterial[matName].surface += a.surface * s * s;
+    }
+
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    if (byMaterial[matName].samples.length < 3) {
+      byMaterial[matName].samples.push(
+        size.x.toFixed(2) + '×' + size.y.toFixed(2) + '×' + size.z.toFixed(2)
+      );
+    }
+  });
+
+  const rows = Object.keys(byMaterial).map((name) => ({
+    'Материал': name,
+    'Мешей': byMaterial[name].count,
+    'OBB (м²)': byMaterial[name].obb.toFixed(3),
+    'Surface (м²)': byMaterial[name].surface.toFixed(3),
+    'Примеры размеров': byMaterial[name].samples.join(' | ')
+  }));
+  rows.sort((a, b) => parseFloat(b['OBB (м²)']) - parseFloat(a['OBB (м²)']));
+  console.log('%c─── ВСЕ МАТЕРИАЛЫ В МОДЕЛИ ───', 'color:#31d0aa;font-weight:bold');
+  console.table(rows);
+
+  console.log('');
+  console.log('%c─── ТЕКУЩИЕ ГРУППЫ (в какую попал каждый материал) ───', 'color:#31d0aa;font-weight:bold');
+  for (const key in elementGroups) {
+    const m = elementGroups[key];
+    if (!m.length) continue;
+    let obbSum = 0;
+    m.forEach((obj) => {
+      const a = getMeshAnalysis(obj);
+      if (a) obbSum += a.obbArea * s * s;
+    });
+    console.log('  ' + key + ': ' + m.length + ' мешей, OBB ' + obbSum.toFixed(3) + ' м²');
+  }
+
+  console.log('');
+  console.log('%c─── ГРУППА HANDRAIL — что там на самом деле ───', 'color:#ff9f43;font-weight:bold');
+  elementGroups.handrail.forEach((obj, i) => {
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const a = getMeshAnalysis(obj);
+    const obbStr = a ? a.obbArea.toFixed(3) : '—';
+    console.log('  #' + (i+1) + ': ' + size.x.toFixed(2) + '×' + size.y.toFixed(2) + '×' + size.z.toFixed(2) + ' м, OBB ' + obbStr + ' м²');
+  });
+
+  console.log('%c═══════════════════════════════════════════', 'color:#5b8cff');
+}
+  /* ═══════════════════════════════════════════════════════════════
+   ДИАГНОСТИКА XML (BOM из Staircon)
+   ═══════════════════════════════════════════════════════════════ */
+
+console.log('%c◈ 3D Viewer готов', 'color:#5b8cff;font-weight:bold;font-size:14px');
+console.log('Модель:', MODEL_FILE);
+console.log('Линейка — M. Человечек — H.');
+</script>
+</body>
+</html>

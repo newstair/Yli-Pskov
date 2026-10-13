@@ -1,0 +1,39 @@
+{
+  "materials": {
+    "pine":  { "name": "Сосна", "textures": ["con_pine.bmp"] },
+    "beech": { "name": "Бук",   "textures": ["con_bok.bmp"] },
+    "ash":   { "name": "Ясень", "textures": ["con_ash.bmp"] },
+    "oak":   { "name": "Дуб",   "textures": ["con_oak.bmp"] }
+  },
+  "categories": {
+    "treads": {
+      "name": "Ступени", "method": "m2", "coef": 1.06,
+      "prices": { "pine": 11161, "beech": 19492, "ash": 28960, "oak": 34626 }
+    },
+    "risers": {
+      "name": "Подступенки", "method": "m2", "coef": 1.25,
+      "prices": { "pine": 10650, "beech": 18544, "ash": 2946, "oak": 35000 }
+    },
+    "stringers": {
+      "name": "Тетивы", "method": "m2", "coef": 1.19,
+      "prices": { "pine": 8926, "beech": 18000, "ash": 26000, "oak": 35000 }
+    },
+    "handrail": {
+      "name": "Поручень", "method": "m2", "coef": 2.29,
+      "prices": { "pine": 7096, "beech": 18000, "ash": 26000, "oak": 35000 }
+    },
+    "posts": {
+      "name": "Столбы", "method": "length", "extra_mm": 100,
+      "prices": { "pine": 3622, "beech": 4709, "ash": 5636, "oak": 6207 }
+    },
+    "baluster": {
+      "name": "Балясины", "method": "count",
+      "prices": { "pine": 650, "beech": 1100, "ash": 1300, "oak": 1800 }
+    },
+    "covering": {
+      "name": "Панель перекрытия", "method": "m2", "coef": 1.0,
+      "prices": { "pine": 10650, "beech": 18000, "ash": 26000, "oak": 35000 }
+    }
+  },
+  "paint": { "price_m2": 2400 }
+}
